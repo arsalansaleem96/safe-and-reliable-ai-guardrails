@@ -275,16 +275,22 @@ class SimpleVectorDB:
             np.linalg.norm(embeddings_array, axis=1) * np.linalg.norm(query_embedding)
         )
 
+        print(f"similarities: {similarities}")
+
         # Convert similarities to distances (1 - similarity)
         distances = 1 - similarities
         # distances = similarities
+        print(f"distances: {distances}")
 
         # Sort indices by distance
         sorted_indices = np.argsort(distances)
+        print(f"sorted_indices: {sorted_indices}")
 
         results = []
         for idx in sorted_indices:
             if distances[idx] < threshold and len(results) < k:
+                print(f"idx: {idx}")
+                print(f"sorted_indices[idx]: {sorted_indices[idx]}")
                 results.append((self.strings[idx], float(distances[idx])))
             else:
                 break
