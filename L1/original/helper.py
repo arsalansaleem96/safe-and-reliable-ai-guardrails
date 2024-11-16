@@ -178,16 +178,18 @@ class ChatWidget:
 
     def bot_response_generator(self, message_history):
         if self.client:
-            response = self.client.chat(
-                model="llama3.1",
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
                 messages=message_history,
+                seed=42,
+                temperature=0.0,
             )
-            bot_msg = response['message']['content']
+            bot_msg = response.choices[0].message.content
             return bot_msg
         else:
             settings.use_server = True
             response = Guard(name=self._guard_name)(
-                model="llama3.1",
+                model="gpt-3.5-turbo",
                 messages=message_history,
             )
 
@@ -275,22 +277,16 @@ class SimpleVectorDB:
             np.linalg.norm(embeddings_array, axis=1) * np.linalg.norm(query_embedding)
         )
 
-        print(f"similarities: {similarities}")
-
         # Convert similarities to distances (1 - similarity)
         distances = 1 - similarities
         # distances = similarities
-        print(f"distances: {distances}")
 
         # Sort indices by distance
         sorted_indices = np.argsort(distances)
-        print(f"sorted_indices: {sorted_indices}")
 
         results = []
         for idx in sorted_indices:
             if distances[idx] < threshold and len(results) < k:
-                print(f"idx: {idx}")
-                print(f"sorted_indices[idx]: {sorted_indices[idx]}")
                 results.append((self.strings[idx], float(distances[idx])))
             else:
                 break
@@ -330,11 +326,13 @@ class RAGChatWidget(ChatWidget):
 
     def bot_response_generator(self, message_history, context=None):
         if self.client:
-            response = self.client.chat(
-                model="llama3.1",
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
                 messages=message_history,
+                seed=42,
+                temperature=0.0,
             )
-            bot_msg = response['message']['content']
+            bot_msg = response.choices[0].message.content
             return bot_msg
         else:
             # Context is a list of touples, we want to map down to the first value in the tuples
@@ -342,7 +340,7 @@ class RAGChatWidget(ChatWidget):
             settings.use_server = True
 
             response = Guard(name=self._guard_name)(
-                model="llama3.1",
+                model="gpt-3.5-turbo",
                 messages=message_history,
                 metadata={"sources": sources, "chunk_strategy": "sentence"},
             )
