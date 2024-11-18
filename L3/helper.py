@@ -1,32 +1,11 @@
 import os
 from typing import List, Tuple
-
 import ipywidgets as widgets
 import numpy as np
-# from dotenv import find_dotenv, load_dotenv
 import litellm
 from guardrails import Guard, settings
 from IPython.display import display
 from sentence_transformers import SentenceTransformer
-
-# these expect to find a .env file at the directory above the lesson.
-# the format for that file is (without the comment)#API_KEYNAME=AStringThatIsTheLongAPIKeyFromSomeService
-
-
-# def load_env():
-#     _ = load_dotenv(find_dotenv())
-
-
-# def get_openai_api_key():
-#     load_env()
-#     openai_api_key = os.getenv("OPENAI_API_KEY")
-#     return openai_api_key
-
-
-# def get_guardrails_api_key():
-#     load_env()
-#     guardrails_api_key = os.getenv("GUARDRAILS_API_KEY")
-#     return guardrails_api_key
 
 
 class ChatWidget:
@@ -187,7 +166,7 @@ class ChatWidget:
             bot_msg = response["choices"][0]["message"]["content"]
             return bot_msg
         else:
-            response = self._guard(
+            response = self.guard(
                 litellm.completion,
                 model="ollama/llama3.1",
                 max_tokens=500,
@@ -337,7 +316,7 @@ class RAGChatWidget(ChatWidget):
         else:
             # Context is a list of touples, we want to map down to the first value in the tuples
             sources = [c[0] for c in context]
-            response = self._guard(
+            response = self.guard(
                 litellm.completion,
                 model="ollama/llama3.1",
                 max_tokens=500,
