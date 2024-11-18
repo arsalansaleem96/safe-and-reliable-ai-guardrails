@@ -3,7 +3,8 @@ from typing import List, Tuple
 
 import ipywidgets as widgets
 import numpy as np
-from dotenv import find_dotenv, load_dotenv
+# from dotenv import find_dotenv, load_dotenv
+import litellm
 from guardrails import Guard, settings
 from IPython.display import display
 from sentence_transformers import SentenceTransformer
@@ -12,24 +13,24 @@ from sentence_transformers import SentenceTransformer
 # the format for that file is (without the comment)#API_KEYNAME=AStringThatIsTheLongAPIKeyFromSomeService
 
 
-def load_env():
-    _ = load_dotenv(find_dotenv())
+# def load_env():
+#     _ = load_dotenv(find_dotenv())
 
 
-def get_openai_api_key():
-    load_env()
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    return openai_api_key
+# def get_openai_api_key():
+#     load_env()
+#     openai_api_key = os.getenv("OPENAI_API_KEY")
+#     return openai_api_key
 
 
-def get_guardrails_api_key():
-    load_env()
-    guardrails_api_key = os.getenv("GUARDRAILS_API_KEY")
-    return guardrails_api_key
+# def get_guardrails_api_key():
+#     load_env()
+#     guardrails_api_key = os.getenv("GUARDRAILS_API_KEY")
+#     return guardrails_api_key
 
 
 class ChatWidget:
-    def __init__(self, client=None, guard_name=None, system_message=None):
+    def __init__(self, client=None, guard=None, system_message=None):
         """
         A widget for handling chat interactions.
 
@@ -85,7 +86,7 @@ class ChatWidget:
             layout=widgets.Layout(width="505px", justify_content="center"),
         )
         self._client = client
-        self._guard_name = guard_name
+        self._guard = guard
 
     @property
     def client(self):
@@ -178,20 +179,21 @@ class ChatWidget:
 
     def bot_response_generator(self, message_history):
         if self.client:
-            response = self.client.chat(
-                model="llama3.1",
+            response = self.client.completion(
+                model="ollama/llama3.1",
                 messages=message_history,
+                api_base="http://localhost:11434",
             )
-            bot_msg = response['message']['content']
+            bot_msg = response["choices"][0]["message"]["content"]
             return bot_msg
         else:
-            settings.use_server = True
-            response = Guard(name=self._guard_name)(
-                model="llama3.1",
-                messages=message_history,
+            response = self._guard(
+                litellm.completion,
+                model="ollama/llama3.1",
+                max_tokens=500,
+                api_base="http://localhost:11434",
+                messages=message_history
             )
-
-            settings.use_server = False
             return response.validated_output
 
 
@@ -275,22 +277,17 @@ class SimpleVectorDB:
             np.linalg.norm(embeddings_array, axis=1) * np.linalg.norm(query_embedding)
         )
 
-        print(f"similarities: {similarities}")
 
         # Convert similarities to distances (1 - similarity)
         distances = 1 - similarities
         # distances = similarities
-        print(f"distances: {distances}")
 
         # Sort indices by distance
         sorted_indices = np.argsort(distances)
-        print(f"sorted_indices: {sorted_indices}")
 
         results = []
         for idx in sorted_indices:
             if distances[idx] < threshold and len(results) < k:
-                print(f"idx: {idx}")
-                print(f"sorted_indices[idx]: {sorted_indices[idx]}")
                 results.append((self.strings[idx], float(distances[idx])))
             else:
                 break
@@ -311,13 +308,13 @@ class RAGChatWidget(ChatWidget):
     def __init__(
         self,
         client=None,
-        guard_name=None,
+        guard=None,
         system_message=None,
         vector_db=None,
         # data_directory="shared_data/",
     ):
         super().__init__(
-            client=client, guard_name=guard_name, system_message=system_message
+            client=client, guard=guard, system_message=system_message
         )
         self.vector_db = vector_db
         # self.data_directory = data_directory
@@ -330,25 +327,24 @@ class RAGChatWidget(ChatWidget):
 
     def bot_response_generator(self, message_history, context=None):
         if self.client:
-            response = self.client.chat(
-                model="llama3.1",
+            response = self.client.completion(
+                model="ollama/llama3.1",
                 messages=message_history,
+                api_base="http://localhost:11434",
             )
-            bot_msg = response['message']['content']
+            bot_msg = response["choices"][0]["message"]["content"]
             return bot_msg
         else:
             # Context is a list of touples, we want to map down to the first value in the tuples
             sources = [c[0] for c in context]
-            settings.use_server = True
-
-            response = Guard(name=self._guard_name)(
-                model="llama3.1",
-                messages=message_history,
-                metadata={"sources": sources, "chunk_strategy": "sentence"},
+            response = self._guard(
+                litellm.completion,
+                model="ollama/llama3.1",
+                max_tokens=500,
+                api_base="http://localhost:11434",
+                # metadata={"sources": sources, "chunk_strategy": "sentence"},
+                messages=message_history
             )
-
-            settings.use_server = False
-
             return response.validated_output
 
     def handle_submit(self, change):
@@ -384,7 +380,7 @@ class RAGChatWidget(ChatWidget):
                 print(e)
 
                 # we don't write here cuz it's errors
-                bot_message = e.body['detail']
+                bot_message = e.body["detail"]
                 error = True
 
             # We show user_msg here instead of the augmented_user_msg to hide the retrieval
